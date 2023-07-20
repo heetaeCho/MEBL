@@ -25,18 +25,20 @@ def getRepo(path):
 def checkout(repo, commit, force=True):
     try:
         repo.git.checkout(commit, force=force)
-        # print("checkout success")
+        print("checkout success")
         return True
     except Exception as e:
-        # print("checkout failed")
+        print("checkout failed")
         return False
 
 def copy_sc(repo, bug_reports, save_base_path):
     project_path = repo.common_dir[:-4]
 
     for bug_report in bug_reports:
+        bug_report.setNewFiles()
         commit = bug_report.getBuggyCommit()
         checkout(repo, commit)
+
         files = bug_report.getFiles()
 
         not_exist_files = []

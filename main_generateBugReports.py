@@ -1,7 +1,7 @@
 from DataProcessor.BenchmarkProcessor import readBenchmarkData, generateBugReports
 from DataProcessor.GitProcessor import getRepo, getAllCommits, copy_sc
 
-from utils import generateDirs
+from utils import generateDirs, loadBugReport, saveBugReport
 import pickle
 
 def updateBugReportsCommit(bug_reports, repo):
@@ -21,10 +21,6 @@ def updateBugReportsCommit(bug_reports, repo):
                 break
             else:
                 prev_commit = this_commit
-
-def saveBugReport(bug_reports, path):
-    with open(path, 'wb') as fw:
-        pickle.dump(bug_reports, fw)
 
 def checkSaved(path):
     with open(path, 'rb') as fr:
@@ -51,10 +47,6 @@ def checkSaved(path):
     for com, cnt in fixed_commits.items():
         if cnt > 1 or len(com) < 8:
             print(cnt, com)
-
-def loadBugReport(path):
-    with open(path, 'rb') as fr:
-        return pickle.load(fr)
 
 def sourceCodeCopyAndUpdateBR(repo, bug_reports, path):
     copy_sc(repo, bug_reports, path)

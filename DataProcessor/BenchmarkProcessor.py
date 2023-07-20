@@ -1,5 +1,4 @@
 from DataStructure.BugReport import BugReport
-from DataStructure.SourceCode import SourceCode
 import pandas as pd
 
 def readBenchmarkData(path):
