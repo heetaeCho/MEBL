@@ -9,7 +9,6 @@ def readCode(file):
     jar_path = './Java/CodeExtractor_Jar/target/CodeExtractor_Jar-0.0.1-jar-with-dependencies.jar'
     jar_data = subprocess.check_output('java -jar {} "{}"'.format(jar_path, file)).decode('cp949')
     jar_data = json.loads(jar_data)
-    
     if jar_data["error"]:
         return True, True
 

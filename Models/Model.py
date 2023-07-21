@@ -3,11 +3,16 @@ import torch
 class Model(torch.nn.Module):
     def __init__(self):
         super(Model, self).__init__()
+        # self.code_encoder = SourceCodeEncoder()
+
         self.nl_encoder = CrossTrEncoder()
         self.pl_encoder = CrossTrEncoder()
         self.classifier = B_Classifier()
         
     def forward(self, nl, sc_nl, sc_pl):
+        # sc_nl = self.code_encoder(sc_nl)
+        # sc_pl = self.code_encoder(sc_pl)
+
         nl_out = self.nl_encoder(nl, sc_nl, sc_nl)
         pl_out = self.pl_encoder(sc_pl, sc_nl, sc_nl)
 
@@ -18,14 +23,14 @@ class B_Classifier(torch.nn.Module):
     def __init__(self):
         super(B_Classifier, self).__init__()
         self.mhca = MHCA()
-        self.linear = torch.nn.Linear(768, 1)
-        self.sig = torch.nn.Sigmoid()
+        self.linear = torch.nn.Linear(768, 2)
+        self.softmax = torch.nn.Softmax()
     
     def forward(self, nl, pl):
         att_out, att_w = self.mhca(pl, nl, nl)
         out = att_out[:, 0, :]
         out = self.linear(out)
-        out = self.sig(out)
+        out = self.softmax(out)
         return out
 
 class MHCA(torch.nn.Module):
@@ -59,6 +64,14 @@ class CrossTrEncoder(torch.nn.Module):
         out = self.norm2(out + self.dropout2(out))
         return out
 
+# class SourceCodeEncoder(torch.nn.Module):
+#     def __init__(self, input_size=768, hidden_size=768, batch_first=True):
+#         super(SourceCodeEncoder, self).__init__()
+#         self.lstm = torch.nn.LSTM(input_size, hidden_size, batch_first=batch_first)
+#     def forward(self, x):
+#         print(x.shape)
+#         out, (hn, cn) = self.lstm(x)
+#         return out
 
 # if __name__ == '__main__':
 #     print(MHCA())

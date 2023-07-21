@@ -8,14 +8,15 @@ import pickle
 
 ebm = EmbeddingModel()
 
-def getDataLoader(bug_reports):
+def getDataLoader(bug_reports, test=False):
     text_helper_path = './Helper/text_embedding_helper.pkl'
     code_helper_path = './Helper/code_embedding_helper.pkl'
     text_embedding_helper, code_embedding_helper = _loadHelper(text_helper_path, code_helper_path)
 
     _setAllCandidates(bug_reports)
     for bug_report in tqdm(bug_reports, ncols=70, desc=" Now Embedding: "):
-        _sampleFalse(bug_report)
+        if not test:
+            _sampleFalse(bug_report)
         full_data = []
 
         if bug_report.getBugId() in text_embedding_helper.keys():
@@ -23,7 +24,7 @@ def getDataLoader(bug_reports):
         else:
             text = bug_report.getSummary() + bug_report.getDescription()
             nl = ebm.embedding('nl', text)
-            text_embedding_helper[bug_report.getBugId()] = nl
+            text_embedding_helper[bug_report.getBugId()] = nl.view(-1, 512, 768)
         
         for file in bug_report.getNewFiles():
             if file in code_embedding_helper.keys():
@@ -32,17 +33,20 @@ def getDataLoader(bug_reports):
                 sc_nl, sc_pl = _codeEmbedding(file)
                 if sc_nl is None: continue
                 code_embedding_helper[file] = (sc_nl, sc_pl)
-
             full_data.append( (nl, sc_nl, sc_pl, 1) )
 
-        for file in bug_report.false_code_files:
+        if test:
+            false_files = bug_report.false_condidates
+        else:
+            false_files = bug_report.false_code_files
+
+        for file in false_files:
             if file in code_embedding_helper.keys():
                 sc_nl, sc_pl = code_embedding_helper[file]
             else:
                 sc_nl, sc_pl = _codeEmbedding(file)
                 if sc_nl is None: continue
                 code_embedding_helper[file] = (sc_nl, sc_pl)
-
             full_data.append( (nl, sc_nl, sc_pl, 0) )
 
     _saveHelper(text_embedding_helper, code_embedding_helper, text_helper_path, code_helper_path)
@@ -76,7 +80,8 @@ def _codeEmbedding(code_file):
     sc_pl_vecs = []
 
     code_file, is_error = readCode(code_file)
-    if is_error == True: return None, None
+    if is_error == True or len(code_file.getCodeChunks()) == 0:
+        return None, None
 
     for code_chunk in code_file.getCodeChunks():
         if "Import" in code_chunk.getDeclaration() or "Package" in code_chunk.getDeclaration():
@@ -113,4 +118,16 @@ def _setAllCandidates(bug_reports):
             false_candidates.extend(bug_reports[j].getNewFiles())
         bug_report.false_condidates = false_candidates
             
+def squeeze(nl, sc_nl, sc_pl):
+    if len(nl.shape) == 4:
+        nl = torch.squeeze(nl)
+    if len(sc_nl.shape) == 4:
+        sc_nl = torch.squeeze(sc_nl)
+    if len(sc_pl.shape) == 4:
+        sc_pl = torch.squeeze(sc_pl)
+    return nl, sc_nl, sc_pl
 
+def makeLabel(labels):
+    results = [ torch.FloatTensor([0, 1]) if label == 1 else torch.FloatTensor([1, 0]) for label in labels ]
+    results = torch.stack(results, dim=0)
+    return results
