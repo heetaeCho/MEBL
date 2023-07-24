@@ -9,7 +9,7 @@ else:
     device = 'cpu'
 
 def train(train_dataloader, load_path, save_path):
-    model = Model().to(device)
+    model = Model().train().to(device)
     try:
         model = loadModel(load_path)
         print('===== Load model =====')
@@ -26,7 +26,7 @@ def train(train_dataloader, load_path, save_path):
 
         results = model(nl, sc_nl, sc_pl)
         labels = makeLabel(labels)
-        
+
         loss = criterion(results, labels.to(device))
 
         optim.zero_grad()

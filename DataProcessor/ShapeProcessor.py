@@ -3,17 +3,21 @@ import torch
 from torch.utils.data import DataLoader
 from Models.EmbeddingModel import EmbeddingModel
 from DataProcessor.SourceCodeProcessor import readCode
+from utils import saveBugReport
 from tqdm import tqdm
 import pickle
 
 ebm = EmbeddingModel()
 
 def getDataLoader(bug_reports, test=False):
-    text_helper_path = './Helper/text_embedding_helper.pkl'
-    code_helper_path = './Helper/code_embedding_helper.pkl'
+    text_helper_path = './Helper/AspectJ_text_embedding_helper.pkl'
+    code_helper_path = './Helper/AspectJ_code_embedding_helper.pkl'
     text_embedding_helper, code_embedding_helper = _loadHelper(text_helper_path, code_helper_path)
 
-    _setAllCandidates(bug_reports)
+    if not test:
+        _setAllCandidates(bug_reports)
+        saveBugReport(bug_reports, "./Dataset/BugReports/AspectJ_with_All_Candidates.plk")
+        
     for bug_report in tqdm(bug_reports, ncols=70, desc=" Now Embedding: "):
         if not test:
             _sampleFalse(bug_report)
@@ -32,6 +36,8 @@ def getDataLoader(bug_reports, test=False):
             else:
                 sc_nl, sc_pl = _codeEmbedding(file)
                 if sc_nl is None: continue
+                sc_nl = sc_nl.view(-1, 512, 768)
+                sc_pl = sc_pl.view(-1, 512, 768)
                 code_embedding_helper[file] = (sc_nl, sc_pl)
             full_data.append( (nl, sc_nl, sc_pl, 1) )
 
@@ -46,6 +52,8 @@ def getDataLoader(bug_reports, test=False):
             else:
                 sc_nl, sc_pl = _codeEmbedding(file)
                 if sc_nl is None: continue
+                sc_nl = sc_nl.view(-1, 512, 768)
+                sc_pl = sc_pl.view(-1, 512, 768)
                 code_embedding_helper[file] = (sc_nl, sc_pl)
             full_data.append( (nl, sc_nl, sc_pl, 0) )
 

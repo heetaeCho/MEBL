@@ -24,7 +24,7 @@ class B_Classifier(torch.nn.Module):
         super(B_Classifier, self).__init__()
         self.mhca = MHCA()
         self.linear = torch.nn.Linear(768, 2)
-        self.softmax = torch.nn.Softmax()
+        self.softmax = torch.nn.Softmax(dim=1)
     
     def forward(self, nl, pl):
         att_out, att_w = self.mhca(pl, nl, nl)
