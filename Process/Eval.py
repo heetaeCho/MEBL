@@ -55,9 +55,11 @@ def prediction(bug_reports, load_path):
 
 def evaluation(bug_report, results, labels):
     print(bug_report.getBugId())
-
+    
     results = [ (res[1], lab) for res, lab in zip(results, labels) ]
     results = sorted(results, key=lambda x:x[0], reverse=True)
+
+    print("Total Candidates: ", len(labels))
     topk(results)
 
 def topk(results):

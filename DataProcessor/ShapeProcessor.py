@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+import copy 
+
 from torch.utils.data import DataLoader
 from Models.EmbeddingModel import EmbeddingModel
 from DataProcessor.SourceCodeProcessor import readCode
@@ -18,7 +20,7 @@ def getDataLoader(bug_reports, test=False):
         _setAllCandidates(bug_reports)
         saveBugReport(bug_reports, "./Dataset/BugReports/AspectJ_with_All_Candidates.plk")
         
-    for bug_report in tqdm(bug_reports, ncols=70, desc=" Now Embedding: "):
+    for bug_report in tqdm(bug_reports, ncols=70, desc=" Now Embedding: ", leave=False):
         if not test:
             _sampleFalse(bug_report)
         full_data = []
@@ -42,7 +44,7 @@ def getDataLoader(bug_reports, test=False):
             full_data.append( (nl, sc_nl, sc_pl, 1) )
 
         if test:
-            false_files = bug_report.false_condidates
+            false_files = bug_report.false_candidates
         else:
             false_files = bug_report.false_code_files
 
@@ -113,7 +115,7 @@ def _codeEmbedding(code_file):
 
 def _sampleFalse(bug_report):
     target_size = len(bug_report.getNewFiles())
-    false_candidates = bug_report.false_condidates
+    false_candidates = bug_report.false_candidates
     false_files = np.random.choice(false_candidates, target_size, replace=False)
     bug_report.false_code_files = false_files
 
@@ -124,7 +126,7 @@ def _setAllCandidates(bug_reports):
         for j in range(len(bug_reports)):
             if i == j: continue
             false_candidates.extend(bug_reports[j].getNewFiles())
-        bug_report.false_condidates = false_candidates
+        bug_report.false_candidates = copy.deepcopy(false_candidates)
             
 def squeeze(nl, sc_nl, sc_pl):
     if len(nl.shape) == 4:

@@ -1,22 +1,45 @@
 import torch
+from collections import OrderedDict
 
 class Model(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, num_layers=8):
         super(Model, self).__init__()
         # self.code_encoder = SourceCodeEncoder()
 
-        self.nl_encoder = CrossTrEncoder()
-        self.pl_encoder = CrossTrEncoder()
+        nl_encoders = OrderedDict()
+        pl_encoders = OrderedDict()
+
+        for i in range(num_layers):
+            nl_encoders['cte_#{}'.format(i+1)] = CrossTrEncoder()
+            pl_encoders['cte_#{}'.format(i+1)] = CrossTrEncoder()
+        
+        self.nl_encoders = torch.nn.Sequential(nl_encoders)
+        self.pl_encoders = torch.nn.Sequential(pl_encoders)
+
+        # self.nl_encoder = CrossTrEncoder()
+        # self.pl_encoder = CrossTrEncoder()
+
         self.classifier = B_Classifier()
         
-    def forward(self, nl, sc_nl, sc_pl):
+    def forward(self, inp):
+        nl, sc_nl, sc_pl = inp
         # sc_nl = self.code_encoder(sc_nl)
         # sc_pl = self.code_encoder(sc_pl)
 
-        nl_out = self.nl_encoder(nl, sc_nl, sc_nl)
-        pl_out = self.pl_encoder(sc_pl, sc_nl, sc_nl)
+        nl_sc_nl = sc_nl
+        pl_sc_nl = sc_nl
+        
+        nl_inp = (nl, nl_sc_nl, nl_sc_nl)
+        pl_inp = (sc_pl, pl_sc_nl, pl_sc_nl)
+        _, _, nl_sc_nl = self.nl_encoders(nl_inp)
+        _, _, pl_sc_nl = self.pl_encoders(pl_inp)
 
-        out = self.classifier(nl_out, pl_out)
+        out = self.classifier(nl_sc_nl, pl_sc_nl)
+
+        # nl_out = self.nl_encoder(nl, sc_nl, sc_nl)
+        # pl_out = self.pl_encoder(sc_pl, sc_nl, sc_nl)
+        # out = self.classifier(nl_out, pl_out)
+
         return out
 
 class B_Classifier(torch.nn.Module):
@@ -57,12 +80,13 @@ class CrossTrEncoder(torch.nn.Module):
         self.norm2 = torch.nn.LayerNorm(dim, 1e-5)
         self.dropout2 = torch.nn.Dropout(0.1)
     
-    def forward(self, q, k, v):
+    def forward(self, inp):
+        q, k, v = inp
         attention_out, _ = self.attention(q, k, v)
         out = self.norm1(v + self.dropout1(attention_out))
         out = self.linear2(self.dropout(self.linear1(out)))
         out = self.norm2(out + self.dropout2(out))
-        return out
+        return q, out, out
 
 # class SourceCodeEncoder(torch.nn.Module):
 #     def __init__(self, input_size=768, hidden_size=768, batch_first=True):
@@ -73,8 +97,17 @@ class CrossTrEncoder(torch.nn.Module):
 #         out, (hn, cn) = self.lstm(x)
 #         return out
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
 #     print(MHCA())
+    model = Model()
+    print(model)
+    a = torch.rand(16, 512, 768)
+    b = torch.rand(16, 512, 768)
+    c = torch.rand(16, 512, 768)
+    inp = (a, b, c)
+    print(model(inp))
+
+
     # encoder_layer = torch.nn.TransformerEncoderLayer(d_model=512, nhead=8)
     # transformer_encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=6)
     # src = torch.rand(10, 32, 512)

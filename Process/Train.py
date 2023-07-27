@@ -1,41 +1,54 @@
-from Models.Model import Model
-from DataProcessor.ShapeProcessor import squeeze, makeLabel
-from utils import loadModel, saveModel
 import torch
+
+from DataProcessor.ShapeProcessor import makeLabel, squeeze
+from Models.Model import Model
+from utils import loadModel, saveModel
 
 if torch.cuda.is_available():
     device = 'cuda:0'
 else:
     device = 'cpu'
 
-def train(train_dataloader, load_path, save_path):
-    model = Model().train().to(device)
-    try:
-        model = loadModel(load_path)
-        print('===== Load model =====')
-    except:
-        print('===== Generating model =====')
-    
-    optim = torch.optim.Adam(model.parameters(), lr=0.0001)
-    criterion = torch.nn.BCELoss()
-    total_loss = 0
+if torch.cuda.is_available():
+    device = 'cuda:0'
+else:
+    device = 'cpu'
 
-    for batch in train_dataloader:
-        nl, sc_nl, sc_pl, labels = batch
-        nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
+class Train:
+    def __init__(self):
+        self.model = Model().train().to(device)
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=1e-2)
+        self.criterion = torch.nn.BCELoss()
+        lambda_fnc = lambda epoch: 0.95 ** epoch
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lr_lambda=lambda_fnc, verbose=False)
 
-        results = model(nl, sc_nl, sc_pl)
-        labels = makeLabel(labels)
+    def train(self, train_dataloader, load_path, save_path, epoch):
+        print("Current learning rate = ", self.scheduler.get_last_lr())
+        try:
+            self.model = loadModel(load_path)
+            print('===== Load model =====')
+        except:
+            print('===== Generating model =====')
 
-        loss = criterion(results, labels.to(device))
+        total_loss = 0
 
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
+        for batch in train_dataloader:
+            nl, sc_nl, sc_pl, labels = batch
+            nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
 
-        total_loss += loss.detach().cpu().numpy()
+            self.optim.zero_grad()
+            
+            results = self.model(nl, sc_nl, sc_pl)
+            labels = makeLabel(labels)
+            loss = self.criterion(results, labels.to(device))
+            loss.backward()
 
-    g_loss = total_loss / len(train_dataloader)
-    saveModel(model, save_path)
-    
-    return g_loss
+            self.optim.step()
+
+            total_loss += loss.detach().cpu().numpy()
+
+        self.scheduler.step()
+        
+        g_loss = total_loss / len(train_dataloader)
+        saveModel(self.model, save_path)
+        return g_loss
