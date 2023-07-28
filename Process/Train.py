@@ -17,7 +17,7 @@ else:
 class Train:
     def __init__(self):
         self.model = Model().train().to(device)
-        self.optim = torch.optim.Adam(self.model.parameters(), lr=1e-2)
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=1e-3)
         self.criterion = torch.nn.BCELoss()
         lambda_fnc = lambda epoch: 0.95 ** epoch
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lr_lambda=lambda_fnc, verbose=False)
@@ -38,7 +38,9 @@ class Train:
 
             self.optim.zero_grad()
             
-            results = self.model(nl, sc_nl, sc_pl)
+            inp = (nl, sc_nl, sc_pl)
+            results = self.model(inp)
+
             labels = makeLabel(labels)
             loss = self.criterion(results, labels.to(device))
             loss.backward()

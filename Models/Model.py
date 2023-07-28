@@ -97,15 +97,15 @@ class CrossTrEncoder(torch.nn.Module):
 #         out, (hn, cn) = self.lstm(x)
 #         return out
 
-if __name__ == '__main__':
-#     print(MHCA())
-    model = Model()
-    print(model)
-    a = torch.rand(16, 512, 768)
-    b = torch.rand(16, 512, 768)
-    c = torch.rand(16, 512, 768)
-    inp = (a, b, c)
-    print(model(inp))
+# if __name__ == '__main__':
+# #     print(MHCA())
+#     model = Model()
+#     print(model)
+#     a = torch.rand(16, 512, 768)
+#     b = torch.rand(16, 512, 768)
+#     c = torch.rand(16, 512, 768)
+#     inp = (a, b, c)
+#     print(model(inp))
 
 
     # encoder_layer = torch.nn.TransformerEncoderLayer(d_model=512, nhead=8)

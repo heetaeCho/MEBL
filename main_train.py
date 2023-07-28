@@ -9,7 +9,7 @@ valid_loss = []
 
 def pipeline(train_bug_reports, valid_bug_reports):
     epoch = 100
-    model_path = "./SavedModel/AspectJ_{}_lr_lambda.pt"
+    model_path = "./SavedModel/AspectJ_{}_#layer_8_lr_lambda.pt"
     trainer = Train()
 
     for e in range(1, epoch+1):
@@ -35,10 +35,10 @@ if __name__ == "__main__":
 
     pipeline(train_br, valid_br)
 
-    # with open('./train_loss.txt', 'w', encoding='utf-8') as f:
-    #     for i in range(len(train_loss)):
-    #         f.write('{},{}\n'.format(i+1, train_loss[i]))
+    with open('./train_loss.txt', 'w', encoding='utf-8') as f:
+        for i in range(len(train_loss)):
+            f.write('{},{}\n'.format(i+1, train_loss[i]))
     
-    # with open('./valid_loss.txt', 'w', encoding='utf-8') as f:
-    #     for i in range(len(valid_loss)):
-    #         f.write('{},{}\n'.format(i+1, valid_loss[i]))
+    with open('./valid_loss.txt', 'w', encoding='utf-8') as f:
+        for i in range(len(valid_loss)):
+            f.write('{},{}\n'.format(i+1, valid_loss[i]))

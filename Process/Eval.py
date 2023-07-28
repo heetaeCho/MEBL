@@ -24,7 +24,8 @@ def validation(valid_dataloader, load_path):
         nl, sc_nl, sc_pl, labels = batch
         nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
 
-        results = model(nl, sc_nl, sc_pl)
+        inp = (nl, sc_nl, sc_pl)
+        results = model(inp)
         labels = makeLabel(labels)
         
         loss = criterion(results, labels.to(device))
@@ -48,7 +49,8 @@ def prediction(bug_reports, load_path):
         nl, sc_nl, sc_pl, labels = batch
         nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
 
-        results = model(nl, sc_nl, sc_pl)
+        inp = (nl, sc_nl, sc_pl)
+        results = model(inp)
         full_res.extend(results.detach().cpu().numpy())
         full_labels.extend(labels.detach().cpu().numpy())
     return full_res, full_labels
