@@ -1,0 +1,12 @@
+{
+"keywords" : 
+    ["String", "boolean", "throws", "default", "long", "new", "strictfp", "instanceof", "volatile", "synchronized", "public", "return", "void", "protected", "package", "float", "interface", "do", "else", "byte", "finally", "switch", "abstract", "private", "transient", "super", "char", "double", "import", "this", "catch", "class", "native", "continue", "while", "throw", "assert", "extends", "for", "if", "short", "int", "case", "final", "static", "enum", "break", "try", "implements", "false", "true", "null"],
+"type_keywords":
+    ["boolean", "byte", "char", "double", "float", "int", "long", "short", "void", "String"],
+"access_keywords":
+    ["private", "protected", "public", "default"],
+"boolean_keywords":
+    ["false", "true"],
+"single_keywords":
+    ["null", "continue", "break", "do"]
+}

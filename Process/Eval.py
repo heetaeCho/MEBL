@@ -17,16 +17,19 @@ def validation(valid_dataloader, load_path):
     except:
         print('===== Generating model =====')
 
-    criterion = torch.nn.BCELoss()
+    # criterion = torch.nn.BCELoss()
+    criterion = torch.nn.CrossEntropyLoss()
     total_loss = 0
     
     for batch in valid_dataloader:
         nl, sc_nl, sc_pl, labels = batch
         nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
 
-        inp = (nl, sc_nl, sc_pl)
+        inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
         results = model(inp)
-        labels = makeLabel(labels)
+
+        labels = makeLabel(labels, bin=True)
+        # labels = makeLabel(labels)
         
         loss = criterion(results, labels.to(device))
 
@@ -41,6 +44,12 @@ def prediction(bug_reports, load_path):
     except:
         print('===== Generating model =====')
 
+    # print("==========================================================")
+    # print(model)
+    # print("==========================================================")
+    # print("#params : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
+    # print("==========================================================")
+
     test_dataloader = getDataLoader(bug_reports, test=True)
 
     full_res = []
@@ -49,7 +58,7 @@ def prediction(bug_reports, load_path):
         nl, sc_nl, sc_pl, labels = batch
         nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
 
-        inp = (nl, sc_nl, sc_pl)
+        inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
         results = model(inp)
         full_res.extend(results.detach().cpu().numpy())
         full_labels.extend(labels.detach().cpu().numpy())
@@ -62,11 +71,12 @@ def evaluation(bug_report, results, labels):
     results = sorted(results, key=lambda x:x[0], reverse=True)
 
     print("Total Candidates: ", len(labels))
+    print(results)
     topk(results)
 
 def topk(results):
     top_n = []
-    for i, (p, r) in enumerate(results):
-        if r == 1:
+    for i, (probability, label) in enumerate(results):
+        if label == 1:
             top_n.append(i+1)
     print(top_n)
