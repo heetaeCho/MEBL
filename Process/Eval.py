@@ -17,21 +17,28 @@ def validation(valid_dataloader, load_path):
     except:
         print('===== Generating model =====')
 
-    # criterion = torch.nn.BCELoss()
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.BCELoss()
+    # criterion = torch.nn.CrossEntropyLoss()
     total_loss = 0
     
     for batch in valid_dataloader:
-        nl, sc_nl, sc_pl, labels = batch
-        nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
+        nl, sc_nl, sc_pl, label = batch
+
+        nl = torch.tensor(nl, dtype=torch.float)
+        sc_nl = torch.tensor(sc_nl, dtype=torch.float)
+        sc_pl = torch.tensor(sc_pl, dtype=torch.float)
+        # label = torch.LongTensor([label])
+        label = torch.FloatTensor([label]) # [1]
+        # label = makeLabel(label)
 
         inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
-        results = model(inp)
-
-        labels = makeLabel(labels, bin=True)
-        # labels = makeLabel(labels)
+        result = model(inp)
         
-        loss = criterion(results, labels.to(device))
+        result = result.view(-1) #[2]
+        result = result[1].view(1) # softmax
+        # result = result[0].view(1) # sigmoid
+
+        loss = criterion(result, label.to(device))
 
         total_loss += loss.detach().cpu().numpy()
     return total_loss/len(valid_dataloader)
@@ -55,19 +62,31 @@ def prediction(bug_reports, load_path):
     full_res = []
     full_labels = []
     for batch in test_dataloader:
-        nl, sc_nl, sc_pl, labels = batch
-        nl, sc_nl, sc_pl = squeeze(nl, sc_nl, sc_pl)
+        nl, sc_nl, sc_pl, label = batch
+
+        nl = torch.tensor(nl, dtype=torch.float)
+        sc_nl = torch.tensor(sc_nl, dtype=torch.float)
+        sc_pl = torch.tensor(sc_pl, dtype=torch.float)
+        # label = torch.LongTensor([label])
+        label = torch.FloatTensor([label]) # [1]
+        # label = makeLabel(label)
 
         inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
-        results = model(inp)
-        full_res.extend(results.detach().cpu().numpy())
-        full_labels.extend(labels.detach().cpu().numpy())
+        result = model(inp)
+        # result = torch.nn.functional.softmax(result)
+        result = result.view(-1) # softmax shape = [2]
+        result = result[1].view(1) # e.g. = [0.34685]
+        # result = result[0].view(1) # sigmoid
+
+        full_res.extend(result.detach().cpu().numpy())
+        full_labels.extend(label.detach().cpu().numpy())
+        
     return full_res, full_labels
 
 def evaluation(bug_report, results, labels):
     print(bug_report.getBugId())
     
-    results = [ (res[1], lab) for res, lab in zip(results, labels) ]
+    results = [ (res, lab) for res, lab in zip(results, labels) ]
     results = sorted(results, key=lambda x:x[0], reverse=True)
 
     print("Total Candidates: ", len(labels))

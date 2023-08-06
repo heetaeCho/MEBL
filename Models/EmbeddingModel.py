@@ -63,8 +63,8 @@ class EmbeddingModel:
                 for key in encode_input.keys():
                     encode_input[key] = torch.cat((encode_input[key][:,:511], encode_input[key][:,-1].view(1,-1)), dim=1)
             output = self.Bert[1](**encode_input)
-            output = self._zero_padding(output[0])
-            # output = output[0]
+            # output = self._zero_padding(output[0])
+            output = output[0]
             return output
 
     def _sc_nl_channel(self, data):
@@ -73,7 +73,7 @@ class EmbeddingModel:
             encode_input = [self.CodeBert[0].cls_token] + encode_input + [self.CodeBert[0].eos_token]
             encode_input = self.CodeBert[0].convert_tokens_to_ids(encode_input)
             output = self.CodeBert[1](torch.tensor(encode_input)[None,:].to(device))[0]
-            output = self._zero_padding(output)
+            # output = self._zero_padding(output)
             return output
 
     def _sc_pl_channel(self, data):
@@ -84,8 +84,8 @@ class EmbeddingModel:
                 attention_mask = encode_input['attention_mask'][:, :],
                 return_dict=True
             )
-            output = self._zero_padding(output[0])
-            # output = output[0]
+            # output = self._zero_padding(output[0])
+            output = output[0]
             return output
 
     # def _nl_channel(self, data):

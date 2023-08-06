@@ -22,8 +22,8 @@ except:
     stop_words = stopwords.words('english')
 
 def getDataLoader(bug_reports, test=False):
-    text_helper_path = './Helper/AspectJ_text_embedding_helper_zero_padding.pkl'
-    code_helper_path = './Helper/AspectJ_code_embedding_helper_zero_padding.pkl'
+    text_helper_path = './Helper/AspectJ_text_embedding_helper_no_padding.pkl'
+    code_helper_path = './Helper/AspectJ_code_embedding_helper_no_padding.pkl'
     text_embedding_helper, code_embedding_helper = _loadHelper(text_helper_path, code_helper_path)
         
     full_data = []
@@ -45,8 +45,8 @@ def getDataLoader(bug_reports, test=False):
             text = ' '.join(new_text)
 
             nl = ebm.embedding('nl', text)
-            nl = nl.view(-1, 512, 768).detach().cpu().numpy()
-            # nl = nl.view(1, -1, 768).detach().cpu().numpy()
+            # nl = nl.view(-1, 512, 768).detach().cpu().numpy()
+            nl = nl.view(1, -1, 768).detach().cpu().numpy()
             text_embedding_helper[bug_report.getBugId()] = nl
         
         for file in bug_report.getNewFiles():
@@ -55,10 +55,8 @@ def getDataLoader(bug_reports, test=False):
             else:
                 sc_nl, sc_pl = _codeEmbedding(file)
                 if sc_nl is None: continue
-                sc_nl = sc_nl.view(-1, 512, 768).detach().cpu().numpy()
-                sc_pl = sc_pl.view(-1, 512, 768).detach().cpu().numpy()
-                # sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
-                # sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
+                sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
+                sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
                 code_embedding_helper[file] = (sc_nl, sc_pl)
             full_data.append( (nl, sc_nl, sc_pl, 1) )
 
@@ -76,10 +74,8 @@ def getDataLoader(bug_reports, test=False):
             else:
                 sc_nl, sc_pl = _codeEmbedding(file)
                 if sc_nl is None: continue
-                sc_nl = sc_nl.view(-1, 512, 768).detach().cpu().numpy()
-                sc_pl = sc_pl.view(-1, 512, 768).detach().cpu().numpy()
-                # sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
-                # sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
+                sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
+                sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
                 code_embedding_helper[file] = (sc_nl, sc_pl)
             full_data.append( (nl, sc_nl, sc_pl, 0) )
 
@@ -104,7 +100,8 @@ def getDataLoader(bug_reports, test=False):
     _saveHelper(text_embedding_helper, code_embedding_helper, text_helper_path, code_helper_path)
 
     # dataloader = DataLoader(full_data, batch_size=1, shuffle=True)
-    dataloader = DataLoader(full_data, batch_size=1, shuffle=False)
+    # dataloader = DataLoader(full_data, batch_size=1, shuffle=False)
+    dataloader = full_data
     return dataloader
 
 def _loadHelper(text_helper_path, code_helper_path):
@@ -160,32 +157,22 @@ def _codeEmbedding(code_file):
         code_chunk = ' '.join(new_code_chunk)
         ####
 
-        sc_nl_vecs.append( torch.squeeze ( ebm.embedding ( 'sc_nl', code_chunk ) ) )
-        sc_pl_vecs.append( torch.squeeze ( ebm.embedding ( 'sc_pl', code_chunk ) ) )
+        sc_nl_vecs.append( torch.mean ( torch.squeeze ( ebm.embedding ( 'sc_nl', code_chunk ) ), dim=0 ) )
+        sc_pl_vecs.append( torch.mean ( torch.squeeze ( ebm.embedding ( 'sc_pl', code_chunk ) ), dim=0 ) )
 
-    sc_nl_vecs = torch.stack(sc_nl_vecs, dim=0) # [#code_chunks, max_len(512), 768]
-    sc_pl_vecs = torch.stack(sc_pl_vecs, dim=0) # [#code_chunks, max_len(512), 768]
-    # new_sc_nl_vecs = sc_nl_vecs[0].view(1, -1, 768)
-    # new_sc_pl_vecs = sc_pl_vecs[0].view(1, -1, 768)
-    # for ix, (sc_nl_vec, sc_pl_vec) in enumerate(zip(sc_nl_vecs, sc_pl_vecs)):
-    #     if ix == 0: continue
-    #     print("\nnew_sc_nl_vecs: {}\n".format(new_sc_nl_vecs.size()))
-    #     print("sc_nl_vec: {}\n".format(sc_nl_vec.size()))
-    #     new_sc_nl_vecs = torch.cat((new_sc_nl_vecs, sc_nl_vec.view(1, -1, 768)), dim=0)
-    #     new_sc_pl_vecs = torch.cat((new_sc_pl_vecs, sc_pl_vec.view(1, -1, 768)), dim=0)
+    sc_nl_vecs = torch.stack(sc_nl_vecs, dim=0) # [#code_chunks, 768] 
+    sc_pl_vecs = torch.stack(sc_pl_vecs, dim=0) # [#code_chunks, 768] 
 
-    # print(new_sc_nl_vecs.size())
-    # print(new_sc_pl_vecs.size())
+    # print("\nsc_nl_vecs: {}\n".format(sc_nl_vecs.size())) # 그래 코드 #chunks 가 다를 수는 없지 
+    # print("sc_pl_vecs: {}\n".format(sc_pl_vecs.size()))   # #tokens in each chunk는 다를 지언정
 
-    if len(sc_nl_vecs) > 1:
-        sc_nl_vec = torch.mean(sc_nl_vecs, dim=0)
-        sc_pl_vec = torch.mean(sc_pl_vecs, dim=0)
-        # sc_nl_vec = torch.mean(new_sc_nl_vecs, dim=0)
-        # sc_pl_vec = torch.mean(new_sc_pl_vecs, dim=0)
-    else:
-        sc_nl_vec = sc_nl_vecs
-        sc_pl_vec = sc_pl_vecs
-    return sc_nl_vec, sc_pl_vec
+    # if len(sc_nl_vecs) > 1:
+    #     sc_nl_vec = torch.mean(sc_nl_vecs, dim=0) # [768]
+    #     sc_pl_vec = torch.mean(sc_pl_vecs, dim=0) # [768]
+    # else:
+    #     sc_nl_vec = sc_nl_vecs
+    #     sc_pl_vec = sc_pl_vecs
+    return sc_nl_vecs, sc_pl_vecs
 
 def _sampleFalse(bug_report):
     target_size = len(bug_report.getNewFiles())
@@ -213,9 +200,11 @@ def squeeze(nl, sc_nl, sc_pl):
 
 def makeLabel(labels, bin=False):
     if bin:
+        print(labels)
         results = [ torch.LongTensor([label]) for label in labels]
         results = torch.squeeze(torch.stack(results, dim=0)).view(-1)
     else:
-        results = [ torch.FloatTensor([0, 1]) if label == 1 else torch.FloatTensor([1, 0]) for label in labels ]
-        results = torch.stack(results, dim=0)
+        results = torch.FloatTensor([[0, 1]]) if labels == 1 else torch.FloatTensor([[1, 0]])
+        # results = [ torch.FloatTensor([0, 1]) if label == 1 else torch.FloatTensor([1, 0]) for label in labels ]
+        # results = torch.stack(results, dim=0)
     return results
