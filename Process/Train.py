@@ -1,7 +1,7 @@
 import torch
 
 from DataProcessor.ShapeProcessor import makeLabel, squeeze
-from Models.Model import Model
+from Models.Model import Model, NV_Classifier
 from utils import loadModel, saveModel
 
 from tqdm import tqdm
@@ -34,6 +34,9 @@ class Train:
         # lambda_fnc = lambda epoch: 0.95 ** epoch
         # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lr_lambda=lambda_fnc, verbose=False)
 
+        self.classifier = NV_Classifier()
+        
+
     def train(self, train_dataloader, load_path, save_path, epoch):
         # print("Current learning rate = ", self.scheduler.get_last_lr())
         # try:
@@ -62,14 +65,33 @@ class Train:
             inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
             result = self.model(inp)
 
-            result = result.view(-1) #[2]
-            result = result[1].view(1) # softmax
-            # result = result[0].view(1) # sigmoid
 
-            # print("\nlabel: {}".format(label))
-            # print("result: {}\n".format(result))
-            
-            loss = self.criterion(result, label.to(device))
+            result = result.detach().cpu().numpy()
+            label = label.detach().cpu().numpy()
+
+            self.classifier.fit(result, label)
+
+            # print("\nsum result: ", sum(result[0]))
+            # print("\nmin result: ", min(result[0]))
+
+            res = self.classifier.pred(result)
+
+            # print("\ntrain_res: ", res)
+            # print("train_label: ", label)
+
+            # exit()
+
+        #     result = result.view(-1) #[2]
+        #     result = result[1].view(1) # softmax
+        #     # result = result[0].view(1) # sigmoid
+
+        #     # print("\nlabel: {}".format(label))
+        #     # print("result: {}\n".format(result))
+
+            res = torch.FloatTensor(res)
+            label = torch.FloatTensor(label)
+
+            loss = self.criterion(res.to(device), label.to(device))
             # print("\nLoss: {}\n".format(loss))
             loss.backward()
 
@@ -79,6 +101,7 @@ class Train:
 
         # self.scheduler.step()
         
-        g_loss = total_loss / len(train_dataloader)
+        # g_loss = total_loss / len(train_dataloader)
         saveModel(self.model, save_path)
-        return g_loss
+        self.classifier.save()
+        # return g_loss

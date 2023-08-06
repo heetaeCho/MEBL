@@ -1,6 +1,8 @@
-from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import CategoricalNB
 import torch
 from collections import OrderedDict
+
+import pickle
 
 class Model(torch.nn.Module):
     def __init__(self, num_layers=4):
@@ -35,8 +37,8 @@ class Model(torch.nn.Module):
         _, _, nl_sc_nl = self.nl_encoders(nl_inp)
         _, _, pl_sc_nl = self.pl_encoders(pl_inp)
 
-        print("\nnl_sc_nl: {}".format(nl_sc_nl))
-        print("pl_sc_nl: {}\n".format(pl_sc_nl))
+        # print("\nnl_sc_nl: {}".format(nl_sc_nl))
+        # print("pl_sc_nl: {}\n".format(pl_sc_nl))
 
         # exit()
         out = self.classifier(nl_sc_nl, pl_sc_nl)        
@@ -46,6 +48,25 @@ class Model(torch.nn.Module):
         # out = self.classifier(nl_out, pl_out)
 
         return out
+
+class NV_Classifier():
+    def __init__(self):
+        self.classifier = CategoricalNB()
+
+    def fit(self, x, y):
+        self.classifier.fit(x, y)
+
+    def pred(self, x):
+        return self.classifier.predict(x)
+
+    def save(self):
+        with open('./nv_classifier.pkl', 'wb') as f:
+            pickle.dump(self.classifier, f)
+    
+    def load(self):
+        with open('./nv_classifier.pkl', 'rb') as f:
+            self.classifier = pickle.load(f)
+
 
 class B_Classifier(torch.nn.Module):
     def __init__(self):
@@ -88,6 +109,7 @@ class B_Classifier(torch.nn.Module):
         # print("pl_out.size(): {}\n".format(pl_out.size()))
 
         out = torch.concatenate((nl_out, pl_out), dim=1) # (1, 768*2)
+        return out
         # print('out: {}\n'.format(out))
         # print("out.size(): {}".format(out.shape))
 

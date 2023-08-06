@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from Models.Model import Model
+from Models.Model import Model, NV_Classifier
 from utils import loadModel
 from DataProcessor.ShapeProcessor import getDataLoader, squeeze, makeLabel
 
@@ -20,7 +20,9 @@ def validation(valid_dataloader, load_path):
     criterion = torch.nn.BCELoss()
     # criterion = torch.nn.CrossEntropyLoss()
     total_loss = 0
-    
+
+    classifier = NV_Classifier()
+    classifier.load()
     for batch in valid_dataloader:
         nl, sc_nl, sc_pl, label = batch
 
@@ -34,11 +36,19 @@ def validation(valid_dataloader, load_path):
         inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
         result = model(inp)
         
-        result = result.view(-1) #[2]
-        result = result[1].view(1) # softmax
-        # result = result[0].view(1) # sigmoid
+        result = result.detach().cpu().numpy()
+        label = label.detach().cpu().numpy()
 
-        loss = criterion(result, label.to(device))
+        res = classifier.pred(result)
+        
+        res = torch.FloatTensor(res)
+        label = torch.FloatTensor(label)
+        
+        # result = result.view(-1) #[2]
+        # result = result[1].view(1) # softmax
+        # # result = result[0].view(1) # sigmoid
+
+        loss = criterion(res.to(device), label.to(device))
 
         total_loss += loss.detach().cpu().numpy()
     return total_loss/len(valid_dataloader)
@@ -74,8 +84,8 @@ def prediction(bug_reports, load_path):
         inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
         result = model(inp)
         # result = torch.nn.functional.softmax(result)
-        result = result.view(-1) # softmax shape = [2]
-        result = result[1].view(1) # e.g. = [0.34685]
+        # result = result.view(-1) # softmax shape = [2]
+        # result = result[1].view(1) # e.g. = [0.34685]
         # result = result[0].view(1) # sigmoid
 
         full_res.extend(result.detach().cpu().numpy())
