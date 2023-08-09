@@ -33,13 +33,16 @@ def readAndUpdateCodeData(bug_reports):
         for file in bug_report.getNewFiles():
             jar_data = subprocess.check_output('java -jar {} "{}"'.format(jar_path, file)).decode('cp949')
             jar_data = json.loads(jar_data)
-
+            
             codeFileData = CodeFile()
             codeFileData.setCommit(file.split('_')[0])
             codeFileData.setQualifiedName(file)
             codeFileData.setError(jar_data['error'])
 
             codes = []
+            if jar_data["codeChunks"] is None:
+                continue
+            
             for code in jar_data["codeChunks"]:
                 codeData = Code(**code)
                 codes.append(codeData)

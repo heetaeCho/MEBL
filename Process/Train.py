@@ -1,8 +1,7 @@
 import torch
 
-from DataProcessor.ShapeProcessor import makeLabel, squeeze
-from Models.Model import Model, NV_Classifier
-from utils import loadModel, saveModel
+from Models.Model import Model, B_Classifier
+from utils import saveModel
 
 from tqdm import tqdm
 
@@ -19,8 +18,11 @@ else:
 class Train:
     def __init__(self):
         self.model = Model().train().to(device)
-        self.optim = torch.optim.Adam(self.model.parameters(), lr=1e-4)
-        self.criterion = torch.nn.BCELoss()
+        self.classifier = B_Classifier().train().to(device)
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=1e-5)
+
+        self.criterion_1 = torch.nn.CosineEmbeddingLoss(margin=-1)
+        self.criterion_2 = torch.nn.BCELoss()
         '''
             # CrossEntropy는 class indices 또는 class probabilities 를 사용 가능.
             #
@@ -34,10 +36,8 @@ class Train:
         # lambda_fnc = lambda epoch: 0.95 ** epoch
         # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optim, lr_lambda=lambda_fnc, verbose=False)
 
-        self.classifier = NV_Classifier()
-        
 
-    def train(self, train_dataloader, load_path, save_path, epoch):
+    def train(self, train_dataloader, m_save_path, c_save_path, epoch):
         # print("Current learning rate = ", self.scheduler.get_last_lr())
         # try:
         #     self.model = loadModel(load_path)
@@ -55,6 +55,7 @@ class Train:
             sc_pl = torch.tensor(sc_pl, dtype=torch.float)
             # label = torch.LongTensor([label]) # [1]
             label = torch.FloatTensor([label]) # [1]
+            sim_label = torch.FloatTensor([label]) if label == 1 else torch.FloatTensor([-1])
             # label = makeLabel(label)
 
             # print(nl.shape) # [1, min(#tokens, max_len), 768]
@@ -63,45 +64,34 @@ class Train:
 
             self.optim.zero_grad()
             inp = (nl.to(device), sc_nl.to(device), sc_pl.to(device))
-            result = self.model(inp)
+            nl_out, pl_out = self.model(inp)
 
+            loss1 = self.criterion_1(nl_out, pl_out, sim_label.to(device))
 
-            result = result.detach().cpu().numpy()
-            label = label.detach().cpu().numpy()
+            result = self.classifier(nl_out, pl_out)
 
-            self.classifier.fit(result, label)
-
-            # print("\nsum result: ", sum(result[0]))
-            # print("\nmin result: ", min(result[0]))
-
-            res = self.classifier.pred(result)
-
-            # print("\ntrain_res: ", res)
-            # print("train_label: ", label)
-
-            # exit()
-
-        #     result = result.view(-1) #[2]
-        #     result = result[1].view(1) # softmax
+            result = result.view(-1) #[2]
+            result = result[1].view(1) # softmax
         #     # result = result[0].view(1) # sigmoid
 
-        #     # print("\nlabel: {}".format(label))
-        #     # print("result: {}\n".format(result))
+            loss2 = self.criterion_2(result, label.to(device))
 
-            res = torch.FloatTensor(res)
-            label = torch.FloatTensor(label)
-
-            loss = self.criterion(res.to(device), label.to(device))
-            # print("\nLoss: {}\n".format(loss))
+            loss = loss1 + loss2
             loss.backward()
+
+            # print("\nlabel: {}".format(label))
+            # print("result: {}".format(result))
+            # print("sim_label: {}".format(sim_label))
+            # print("\nLoss1: {}".format(loss1))
+            # print("Loss2: {}\n".format(loss2))
 
             self.optim.step()
 
-            total_loss += loss.detach().cpu().numpy()
+            total_loss += loss.item()
 
         # self.scheduler.step()
         
-        # g_loss = total_loss / len(train_dataloader)
-        saveModel(self.model, save_path)
-        self.classifier.save()
-        # return g_loss
+        g_loss = total_loss / len(train_dataloader)
+        saveModel(self.model, m_save_path)
+        saveModel(self.classifier, c_save_path)
+        return g_loss

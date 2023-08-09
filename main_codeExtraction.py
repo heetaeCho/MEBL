@@ -8,6 +8,7 @@ def checker(bug_report):
 
 if __name__ == "__main__":
     project = "AspectJ"
+    project = "Tomcat"
 
     path = './dataset/BugReports/{}.plk'.format(project)
     bug_reports = loadBugReport(path)

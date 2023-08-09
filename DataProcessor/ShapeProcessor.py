@@ -11,6 +11,8 @@ from DataProcessor.SourceCodeProcessor import readCode
 from tqdm import tqdm
 import pickle
 
+from threading import Thread
+
 ebm = EmbeddingModel()
 keywords = json.load(open("./DataProcessor/keywords.json"))["keywords"]
 punctuation = string.punctuation
@@ -21,9 +23,137 @@ except:
     nltk.download('stopwords')
     stop_words = stopwords.words('english')
 
-def getDataLoader(bug_reports, test=False):
-    text_helper_path = './Helper/AspectJ_text_embedding_helper_no_padding.pkl'
-    code_helper_path = './Helper/AspectJ_code_embedding_helper_no_padding.pkl'
+def getCodeBertDataLoader(bug_reports, project, test=False):
+    text_helper_path = './Helper/{}_text_embedding_helper_padding.pkl'.format(project)
+    code_helper_path = './Helper/{}_code_embedding_helper_padding.pkl'.format(project)
+    text_embedding_helper, code_embedding_helper = _loadHelper(text_helper_path, code_helper_path)
+
+    teh_size = len(text_embedding_helper)
+    ceh_size = len(code_embedding_helper)
+
+    full_data = []
+    for bug_report in tqdm(bug_reports, ncols=70, desc=" Now Embedding: ", leave=True):
+        if not test:
+            _sampleFalse(bug_report)
+        
+        if bug_report.getBugId() in text_embedding_helper.keys():
+            nl = text_embedding_helper[bug_report.getBugId()]
+        else:
+            text = bug_report.getSummary() + bug_report.getDescription()
+            text = text.lower()
+
+            new_text = []
+            for token in text.split():
+                if token in stop_words:
+                    continue
+                new_text.append(token)
+            text = ' '.join(new_text)
+
+
+            # nl = ebm.embedding('nl', text)
+            nl = ebm.embedding('sc_nl', text)
+
+            # nl = nl.view(-1, 512, 768).detach().cpu().numpy()
+            nl = nl.view(1, -1, 768).detach().cpu().numpy()
+            text_embedding_helper[bug_report.getBugId()] = nl
+        
+
+        ##############
+        # new_files = bug_report.getNewFiles()
+        # res_1, code_embedding_helper = _getCodeEmbedding(new_files, nl, code_embedding_helper, 1)
+        # full_data.extend(res_1)
+
+        # if test:
+        #     false_files = bug_report.false_candidates
+        # else:
+        #     false_files = bug_report.false_code_files
+
+        # start = 0
+        # end = len(false_files)
+        # piv = (start + end) // 16
+        # threads = []
+        # for i in range(16):
+        #     if i == 15:
+        #         files = false_files[i*piv:]
+        #     else:
+        #         files = false_files[i*piv:(i+1)*piv]
+        #     threads.append(CustomThread(target=_getCodeEmbedding, args=(files, nl, code_embedding_helper, 0,)))
+
+        # for thread in threads:
+        #     thread.run()
+        
+        # for thread in threads:
+        #     thread.join()
+
+        # for thread in threads:
+        #     full_data.extend(thread.temp)
+        #     if teh_size < len(text_embedding_helper) or ceh_size < len(code_embedding_helper):
+        #         _saveHelper(text_embedding_helper, code_embedding_helper, text_helper_path, code_helper_path)
+        
+        # print("len(full_data) = ", len(full_data))
+
+        # res_2, code_embedding_helper = _getCodeEmbedding(false_files, nl, code_embedding_helper, 0)
+        # full_data.extend(res_2)
+        ################
+
+
+        for file in bug_report.getNewFiles():
+            if file in code_embedding_helper.keys():
+                sc_nl, sc_pl = code_embedding_helper[file]
+            else:
+                sc_nl, sc_pl = _codeEmbedding(file)
+                if sc_nl is None: continue
+                sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
+                sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
+                code_embedding_helper[file] = (sc_nl, sc_pl)
+            full_data.append( (nl[0], sc_nl[0], sc_pl[0], 1) )
+            
+        # dataloader = DataLoader(full_data, batch_size=1, shuffle=True)
+        # return dataloader
+    
+        if test:
+            false_files = bug_report.false_candidates
+        else:
+            false_files = bug_report.false_code_files
+
+        if test:
+            false_files = tqdm(false_files, desc="False Files", ncols=70)
+
+        for file in false_files:
+            if file in code_embedding_helper.keys():
+                sc_nl, sc_pl = code_embedding_helper[file]
+            else:
+                sc_nl, sc_pl = _codeEmbedding(file)
+                if sc_nl is None: continue
+                sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
+                sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
+                code_embedding_helper[file] = (sc_nl, sc_pl)
+            full_data.append( (nl[0], sc_nl[0], sc_pl[0], 0) )
+            
+    if teh_size != len(text_embedding_helper) or ceh_size != len(code_embedding_helper):
+        _saveHelper(text_embedding_helper, code_embedding_helper, text_helper_path, code_helper_path)
+
+    dataloader = DataLoader(full_data, batch_size=1, shuffle=True)
+    return dataloader
+
+# def _getCodeEmbedding(files, nl, code_embedding_helper, label):
+#     temp = []
+#     for file in tqdm(files, desc="False Files", ncols=70):
+#         if file in code_embedding_helper.keys():
+#             sc_nl, sc_pl = code_embedding_helper[file]
+#         else:
+#             sc_nl, sc_pl = _codeEmbedding(file)
+#             if sc_nl is None: continue
+#             sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
+#             sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
+#             code_embedding_helper[file] = (sc_nl, sc_pl)
+#         temp.append( (nl[0], sc_nl[0], sc_pl[0], label) )
+#     return temp, code_embedding_helper
+
+
+def getDataLoader(bug_reports, project, test=False):
+    text_helper_path = './Helper/{}_text_embedding_helper_no_padding.pkl'.format(project)
+    code_helper_path = './Helper/{}_code_embedding_helper_no_padding.pkl'.format(project)
     text_embedding_helper, code_embedding_helper = _loadHelper(text_helper_path, code_helper_path)
         
     full_data = []
@@ -58,7 +188,7 @@ def getDataLoader(bug_reports, test=False):
                 sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
                 sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
                 code_embedding_helper[file] = (sc_nl, sc_pl)
-            full_data.append( (nl, sc_nl, sc_pl, 1) )
+            full_data.append( (nl[0], sc_nl[0], sc_pl[0], 1) )
 
         if test:
             false_files = bug_report.false_candidates
@@ -77,7 +207,7 @@ def getDataLoader(bug_reports, test=False):
                 sc_nl = sc_nl.view(1, -1, 768).detach().cpu().numpy()
                 sc_pl = sc_pl.view(1, -1, 768).detach().cpu().numpy()
                 code_embedding_helper[file] = (sc_nl, sc_pl)
-            full_data.append( (nl, sc_nl, sc_pl, 0) )
+            full_data.append( (nl[0], sc_nl[0], sc_pl[0], 0) )
 
     #         if ix == 3:
     #             break
@@ -99,9 +229,9 @@ def getDataLoader(bug_reports, test=False):
 
     _saveHelper(text_embedding_helper, code_embedding_helper, text_helper_path, code_helper_path)
 
-    # dataloader = DataLoader(full_data, batch_size=1, shuffle=True)
+    dataloader = DataLoader(full_data, batch_size=1, shuffle=True)
     # dataloader = DataLoader(full_data, batch_size=1, shuffle=False)
-    dataloader = full_data
+    # dataloader = full_data
     return dataloader
 
 def _loadHelper(text_helper_path, code_helper_path):
@@ -157,8 +287,10 @@ def _codeEmbedding(code_file):
         code_chunk = ' '.join(new_code_chunk)
         ####
 
-        sc_nl_vecs.append( torch.mean ( torch.squeeze ( ebm.embedding ( 'sc_nl', code_chunk ) ), dim=0 ) )
+        sc_nl_vecs.append( torch.mean ( torch.squeeze ( ebm.embedding ( 'sc_nl', code_chunk ) ), dim=0 ) ) # (1, 1, 768)
         sc_pl_vecs.append( torch.mean ( torch.squeeze ( ebm.embedding ( 'sc_pl', code_chunk ) ), dim=0 ) )
+        # sc_nl_vecs.append( torch.squeeze ( ebm.embedding ( 'sc_nl', code_chunk ) ), dim=0 ) # (1, 512, 768)
+        # sc_pl_vecs.append( torch.squeeze ( ebm.embedding ( 'sc_pl', code_chunk ) ), dim=0 )
 
     sc_nl_vecs = torch.stack(sc_nl_vecs, dim=0) # [#code_chunks, 768] 
     sc_pl_vecs = torch.stack(sc_pl_vecs, dim=0) # [#code_chunks, 768] 

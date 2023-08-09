@@ -55,8 +55,8 @@ def sourceCodeCopyAndUpdateBR(repo, bug_reports, path):
 if __name__ == "__main__":
     # projects = {'AspectJ':"org.aspectj", 'Birt':'birt', 'Eclipse_Platform_UI':'eclipse.platform.ui', 'JDT':'eclipse.jdt.ui', 'SWT':'eclipse.platform.swt', 'Tomcat':'tomcat'}
     # projects = {'AspectJ':"org.aspectj", 'Birt':'birt', 'Eclipse_Platform_UI':'eclipse.platform.ui', 'JDT':'eclipse.jdt.ui', 'SWT':'eclipse.platform.swt'}
-    # projects = {'Tomcat':'tomcat'}
-    projects = {'AspectJ':"org.aspectj"}
+    # projects = {'AspectJ':"org.aspectj"}
+    projects = {'Tomcat':'tomcat'}
     generateDirs(projects)
 
     benchmark_path = "./Dataset/benchmark/{}.xlsx"

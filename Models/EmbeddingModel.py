@@ -58,33 +58,42 @@ class EmbeddingModel:
 
     def _nl_channel(self, data):
         with torch.no_grad():
-            encode_input = self.Bert[0](data, return_tensors='pt', max_length=512, truncation=True).to(device)
+            # encode_input = self.Bert[0](data, return_tensors='pt', max_length=512, truncation=True).to(device)
+            encode_input = self.Bert[0](data, return_tensors='pt', max_length=512, padding="max_length", truncation=True).to(device)
             if encode_input['input_ids'].shape[-1] > 512:
                 for key in encode_input.keys():
                     encode_input[key] = torch.cat((encode_input[key][:,:511], encode_input[key][:,-1].view(1,-1)), dim=1)
             output = self.Bert[1](**encode_input)
+
             # output = self._zero_padding(output[0])
+
             output = output[0]
             return output
 
     def _sc_nl_channel(self, data):
         with torch.no_grad():
-            encode_input = self.CodeBert[0].tokenize(data, max_length=510, truncation=True)
+            # encode_input = self.CodeBert[0].tokenize(data, max_length=510, truncation=True)
+            encode_input = self.CodeBert[0].tokenize(data, max_length=510, padding="max_length", truncation=True)
             encode_input = [self.CodeBert[0].cls_token] + encode_input + [self.CodeBert[0].eos_token]
             encode_input = self.CodeBert[0].convert_tokens_to_ids(encode_input)
             output = self.CodeBert[1](torch.tensor(encode_input)[None,:].to(device))[0]
+
             # output = self._zero_padding(output)
+
             return output
 
     def _sc_pl_channel(self, data):
         with torch.no_grad():
-            encode_input = self.NatGen[0](data, return_tensors='pt', max_length=512, truncation=True).to(device)
+            # encode_input = self.NatGen[0](data, return_tensors='pt', max_length=512, truncation=True).to(device)
+            encode_input = self.NatGen[0](data, return_tensors='pt', max_length=512, padding="max_length", truncation=True).to(device)
             output = self.NatGen[1].encoder(
                 input_ids = encode_input['input_ids'][:, :],
                 attention_mask = encode_input['attention_mask'][:, :],
                 return_dict=True
             )
+
             # output = self._zero_padding(output[0])
+
             output = output[0]
             return output
 
